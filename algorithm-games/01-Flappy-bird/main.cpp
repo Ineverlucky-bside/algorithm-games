@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <ctime>
+#include <vector>
 
 class Bird
 {
@@ -112,18 +113,28 @@ inline bool isKeyPressed(int virtualKey)
 
 int main()
 {
+	bool is_running = true;
 	//初始化随机数种子
 	srand(static_cast<unsigned int>(time(nullptr)));
 	const int WINDOW_WIDTH = 800;
 	const int WINDOW_HEIGHT = 600; //设置宽高
+	const int PIPE_COUNT = 3; //水管数量
+	const int PIPE_SPACE = 300; //水管间距
 
 	initgraph(WINDOW_WIDTH, WINDOW_HEIGHT); //初始化画面
 	BeginBatchDraw(); //双缓冲
 
 	Bird bird(150, 200);
 	Pipe pipe(WINDOW_WIDTH, WINDOW_HEIGHT); //初始生成在画面的最有边界
+	std::vector<Pipe> pipes;
+	pipes.reserve(PIPE_COUNT); //预分配内存，避免动态扩容的额外开销
+
+	for (int i = 0; i < PIPE_COUNT; i++)
+	{
+		pipes.emplace_back(WINDOW_WIDTH + i * PIPE_SPACE, WINDOW_HEIGHT); // 构造对象
+	}
 	
-	while (true)
+	while (is_running)
 	{
 		//处理输入
 		if (isKeyPressed(VK_SPACE))
@@ -132,23 +143,29 @@ int main()
 		}
 
 		//状态更新
-		bird.update();
-		pipe.update();
-
-		//障碍物离开屏幕后从右侧刷新
-		if (pipe.isOutOfScreen())
+		bird.update(); 
+		for (auto& pipe : pipes)
 		{
-			pipe.reset(WINDOW_WIDTH);
+			pipe.update();
+			//障碍物离开屏幕后从右侧刷新
+			if (pipe.isOutOfScreen())
+			{
+				pipe.reset(WINDOW_WIDTH);
+			}
+			if (bird.getY() + bird.getRadius() >= WINDOW_HEIGHT || bird.getY() - bird.getRadius() <= 0 || pipe.checkCollision(bird))
+			{
+				is_running = false;
+				break;
+			}
 		}
-
-		if (bird.getY() + bird.getRadius() >= WINDOW_HEIGHT || bird.getY() - bird.getRadius() <= 0 || pipe.checkCollision(bird))
-		{
-			break;
-		}
-
+			
 		cleardevice();
 		bird.draw();
-		pipe.draw();
+		for (const auto& pipe : pipes)
+		{
+			pipe.draw();
+		}
+		
 		FlushBatchDraw(); 
 		
 		Sleep(20);//设置帧率
