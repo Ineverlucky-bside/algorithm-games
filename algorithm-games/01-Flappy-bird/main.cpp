@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <vector>
+#include <string>
+#include "EasyXPng.h"
 
 class Bird
 {
@@ -17,13 +19,15 @@ private:
 	double gravity = 0.6; //重力加速度
 	double jump_velocity = -8.5; //起跳速度
 
+	IMAGE* pBirdImage = nullptr;//保存小鸟图片的指针
+
 public:
-	Bird(double start_x, double start_y) : x(start_x), y(start_y) {}
+	Bird(double start_x, double start_y, IMAGE* img = nullptr) : x(start_x), y(start_y), pBirdImage(img){}
 
 	//每一帧物理更新（小鸟会随着时间下落）
 	void update()
 	{
-		vy += gravity;
+		vy += gravity; //匀加速直线运动的写法
 		y += vy;
 	}
 	//玩家按键起跳
@@ -35,8 +39,19 @@ public:
 	//绘制画面
 	void draw() const
 	{
-		setfillcolor(YELLOW);
-		solidcircle(static_cast<int>(x), static_cast<int>(y), radius);
+		if (pBirdImage != nullptr)
+		{
+			//图片中心对齐小鸟
+			int drawX = static_cast<int>(x - pBirdImage->getwidth() / 2.0);
+			int drawY = static_cast<int>(y - pBirdImage->getwidth() / 2.0);
+
+			putimagePng(drawX, drawY, pBirdImage);
+		}
+		else
+		{
+			setfillcolor(YELLOW);
+			solidcircle(static_cast<int>(x), static_cast<int>(y), radius);
+		}
 	}
 
 	//设置只读接口（外部用来检测碰撞）
@@ -54,6 +69,7 @@ private:
 	int topHeight; //上水管的高度
 	double speed = 3.0; // 向左平移的速度
 	int windowHeight; //窗口总高度
+	bool passed = false; // 检查这根水管是否参与几分
 
 public:
 	Pipe(double start_x, int win_height) : x(start_x), windowHeight(win_height)
@@ -67,11 +83,12 @@ public:
 		int minHeight = 80;
 		int maxHeight = windowHeight - gap - 80;
 		topHeight = minHeight + rand() % (maxHeight - minHeight);
+		passed = false; 
 	}
 	//帧更新向左移动
 	void update()
 	{
-		x -= speed;
+		x -= speed; //匀速直线运动
 	}
 	//绘制上下水管
 	void draw() const
@@ -85,7 +102,17 @@ public:
 	{
 		return (x + width) < 0;
 	}
-	//碰撞检测：判断是否碰到了小鸟
+
+	bool checkPassed()
+	{
+		if (!passed && isOutOfScreen())
+		{
+			passed = true;
+			return true;
+		}
+		return false;
+	}
+	//碰撞检测：判断是否碰到了小鸟 AABB碰撞
 	bool checkCollision(const Bird& bird) const
 	{
 		double bx = bird.getX();
@@ -124,8 +151,18 @@ int main()
 	initgraph(WINDOW_WIDTH, WINDOW_HEIGHT); //初始化画面
 	BeginBatchDraw(); //双缓冲
 
-	Bird bird(150, 200);
-	Pipe pipe(WINDOW_WIDTH, WINDOW_HEIGHT); //初始生成在画面的最有边界
+	IMAGE imBackground; // 定义图像对象
+	IMAGE imBird;
+	loadimage(&imBackground, _T("背景.png"), WINDOW_WIDTH, WINDOW_HEIGHT);
+	loadimage(&imBird, _T("鸟.png"));
+
+	//设置文字样式
+	setbkmode(TRANSPARENT);
+	settextstyle(32, 0, _T("Consolas"));
+	settextcolor(BLUE);
+
+	int score = 0; // 记录分数
+	Bird bird(150, 200, &imBird);
 	std::vector<Pipe> pipes;
 	pipes.reserve(PIPE_COUNT); //预分配内存，避免动态扩容的额外开销
 
@@ -147,12 +184,28 @@ int main()
 		for (auto& pipe : pipes)
 		{
 			pipe.update();
+			//记录分数
+			if (pipe.checkPassed())
+			{
+				score++;
+			}
 			//障碍物离开屏幕后从右侧刷新
 			if (pipe.isOutOfScreen())
 			{
-				pipe.reset(WINDOW_WIDTH);
+				pipe.reset(pipe.getX() + PIPE_COUNT * PIPE_SPACE);
 			}
-			if (bird.getY() + bird.getRadius() >= WINDOW_HEIGHT || bird.getY() - bird.getRadius() <= 0 || pipe.checkCollision(bird))
+		}
+
+		//碰撞判定
+		if ( bird.getY() + bird.getRadius() >= WINDOW_HEIGHT || bird.getY() - bird.getRadius() <= 0 )
+		{
+			is_running = false;
+			break;
+		}
+
+		for (const auto& pipe : pipes)
+		{
+			if (pipe.checkCollision(bird))
 			{
 				is_running = false;
 				break;
@@ -160,11 +213,16 @@ int main()
 		}
 			
 		cleardevice();
+		putimage(0, 0, &imBackground);
 		bird.draw();
 		for (const auto& pipe : pipes)
 		{
 			pipe.draw();
 		}
+
+		//绘制分数
+		std::wstring scoreStr = L"Score: " + std::to_wstring(score);
+		outtextxy(30, 20, scoreStr.c_str());
 		
 		FlushBatchDraw(); 
 		
