@@ -71,8 +71,12 @@ private:
 	int windowHeight; //窗口总高度
 	bool passed = false; // 检查这根水管是否参与几分
 
+	IMAGE* pTopImage = nullptr;
+	IMAGE* pBottomImage = nullptr;
+
+
 public:
-	Pipe(double start_x, int win_height) : x(start_x), windowHeight(win_height)
+	Pipe(double start_x, int win_height, IMAGE* imgTop, IMAGE* imgBottom) : x(start_x), windowHeight(win_height), pTopImage(imgTop), pBottomImage(imgBottom)
 	{
 		reset(start_x);
 	}
@@ -93,9 +97,21 @@ public:
 	//绘制上下水管
 	void draw() const
 	{
-		setfillcolor(GREEN);
-		solidrectangle(static_cast<int>(x), 0, static_cast<int>(x + width), topHeight);
-		solidrectangle(static_cast<int>(x), topHeight + gap, static_cast<int>(x + width), windowHeight);
+		if (pTopImage != nullptr && pBottomImage != nullptr)
+		{
+			int drawX = static_cast<int> (x);
+			int topDrawY = topHeight - pTopImage->getheight();
+			putimagePng(drawX, topDrawY, pTopImage);
+
+			int bottomDrawY = topHeight + gap;
+			putimagePng(drawX, bottomDrawY, pBottomImage);
+		}
+		else
+		{
+			setfillcolor(GREEN);
+			solidrectangle(static_cast<int>(x), 0, static_cast<int>(x + width), topHeight);
+			solidrectangle(static_cast<int>(x), topHeight + gap, static_cast<int>(x + width), windowHeight);
+		}
 	}
 	//判断是否飞出了屏幕左侧
 	bool isOutOfScreen() const
@@ -156,6 +172,11 @@ int main()
 	loadimage(&imBackground, _T("背景.png"), WINDOW_WIDTH, WINDOW_HEIGHT);
 	loadimage(&imBird, _T("鸟.png"));
 
+	IMAGE imPipeTop;
+	IMAGE imPipeBottom;
+	loadimage(&imPipeTop, _T("障碍物 上.png"));
+	loadimage(&imPipeBottom, _T("障碍物 下.png"));
+
 	//设置文字样式
 	setbkmode(TRANSPARENT);
 	settextstyle(32, 0, _T("Consolas"));
@@ -168,7 +189,7 @@ int main()
 
 	for (int i = 0; i < PIPE_COUNT; i++)
 	{
-		pipes.emplace_back(WINDOW_WIDTH + i * PIPE_SPACE, WINDOW_HEIGHT); // 构造对象
+		pipes.emplace_back(WINDOW_WIDTH + i * PIPE_SPACE, WINDOW_HEIGHT, &imPipeTop, &imPipeBottom); // 构造对象
 	}
 	
 	while (is_running)
